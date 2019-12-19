@@ -15,9 +15,7 @@ fn main() {
 
 
 fn run_test(program: &intcode::Program, id: i32) -> i32 {
-    let program = program.to_vec();   //  create copy
-    let input = vec![id];
-    let output = intcode::run(program, input);
+    let output = intcode::run(program, vec![id]);
     *output.last().unwrap()
 }
 

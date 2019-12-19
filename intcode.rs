@@ -1,11 +1,12 @@
 use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
-use either::Either;
 
-pub type Program = Vec<i32>;
-pub type Data = Vec<i32>;
-pub type Result = Either<Data, Box<Fn<Data, Data>>>;
+pub type Word = i64;
+pub type Program = Vec<Word>;
+pub type Data = Vec<Word>;
+pub type State = (Program, Word, Word);
+pub type Result = (Data, State);
 
 
 #[allow(dead_code)]
@@ -20,98 +21,141 @@ pub fn read(filename: &str) -> Program {
 pub fn parse(program: &str) -> Program {
     program
         .split(',')
-        .map(|s| s.parse::<i32>().unwrap())
+        .map(|s| s.parse::<Word>().unwrap())
         .collect()
 }
 
 #[allow(dead_code)]
-pub fn run0(program: Program, res: i32) -> i32 {
-    run_(program, Vec::new(), Some(res))[0]
+pub fn run0(program: &Program, res: Word) -> Word {
+    let (_, state) = run_(init(program), Vec::new());
+    state.0[res as usize]
 }
 
 #[allow(dead_code)]
-pub fn run(program: Program, input: Data) -> Data {
-    run_(program, input, None)
+pub fn run(program: &Program, input: Data) -> Data {
+    let (output, _) = run_(init(program), input);
+    output
 }
 
-pub fn run_async(program: Program, input: Data) ->
+#[allow(dead_code)]
+pub fn init(program: &Program) -> State {
+    (program.clone(), 0, 0)
+}
 
-fn run_(mut program: Program, input: Data, res: Option<i32>) -> Data {
+#[allow(dead_code)]
+pub fn run_async(state: State, input: Data) -> Result {
+    run_(state, input)
+}
+
+
+fn run_((mut program, mut ip, mut rel_base): State, input: Data) -> Result {
     let mut output = Vec::new();
     let mut i = 0;
-    let mut j = 0;
     loop {
-        let opcode = program[i];
+        let opcode = program[ip as usize];
         let modes = opcode / 100;
         let opcode = opcode % 100;
 
-        let mut ctx = (&mut program, i, modes);
+        let mut ctx = (&mut program, ip, rel_base, modes);
 
-        let di = match opcode {
+        ip = match opcode {
             1 => {  //  add
                 let a1 = load(&ctx, 1);
                 let a2 = load(&ctx, 2);
                 save(&mut ctx, 3, a1 + a2);
-                4 },
+                ip + 4
+            },
             2 => {  //  mul
                 let a1 = load(&ctx, 1);
                 let a2 = load(&ctx, 2);
                 save(&mut ctx, 3, a1 * a2);
-                4 },
+                ip + 4
+            },
             3 => {  //  input
-                save(&mut ctx, 1, input[j]);
-                j += 1;
-                2 },
+                if i < input.len() {
+                    save(&mut ctx, 1, input[i]);
+                    i += 1;
+                    ip + 2
+                } else {
+                    break;
+                }
+            },
             4 => {  //  output
                 let a = load(&ctx, 1);
                 output.push(a);
-                2 },
+                ip + 2
+            },
             5 => {  //  jump-if-true
                 let a1 = load(&ctx, 1);
                 if a1 != 0 {
-                    i = load(&ctx, 2) as usize; 0
-                } else { 3 }
-                },
+                    load(&ctx, 2)
+                } else {
+                    ip + 3
+                }
+            },
             6 => {  //  jump-if-false
                 let a1 = load(&ctx, 1);
                 if a1 == 0 {
-                    i = load(&ctx, 2) as usize; 0
-                } else { 3 }
-                },
+                    load(&ctx, 2)
+                } else {
+                    ip + 3
+                }
+            },
             7 => {  //  less
                 let a1 = load(&ctx, 1);
                 let a2 = load(&ctx, 2);
                 save(&mut ctx, 3, if a1 < a2 { 1 } else { 0 });
-                4 },
+                ip + 4
+            },
             8 => {  //  equals
                 let a1 = load(&ctx, 1);
                 let a2 = load(&ctx, 2);
                 save(&mut ctx, 3, if a1 == a2 { 1 } else { 0 });
-                4 },
+                ip + 4
+            },
+            9 => {  //  adjust relative base
+                let a1 = load(&ctx, 1);
+                rel_base += a1;
+                ip + 2
+            },
             99 => break,
             _ => panic!("unknown opcode {}", opcode)
         };
-        i += di;
     }
 
-    if res.is_some() {
-        output.push(program[res.unwrap() as usize]);
-    }
-    output
+    (output, (program, ip, rel_base))
 }
 
-fn load((program, i, modes): &(&mut Program, usize, i32), n: u8) -> i32 {
-    let v = program[*i + n as usize];
+
+fn load((program, ip, rel_base, modes): &(&mut Program, Word, Word, Word), n: u8) -> Word {
+    let v = program[(*ip + n as Word) as usize];
     let p = 10_u32.pow(n as u32 - 1);
     let mode = (*modes as u32 / p) % 10;
     match mode {
-        0 => program[v as usize],
+        0 => get(program, v as usize),
         1 => v,
-        _ => panic!("unknown mode {}", mode)
+        2 => get(program, (*rel_base + v) as usize),
+        _ => panic!("unknown address mode {}", mode)
     }
 }
 
-fn save((program, i, _modes): &mut(&mut Program, usize, i32), n: u8, v: i32) {
-    let i = program[*i + n as usize];
-    program[i as usize] = v;
+fn get(program: &Program, addr: usize) -> Word {
+    if program.len() <= addr { 0 } else { program[addr] }
 }
+
+fn save((program, ip, rel_base, modes): &mut(&mut Program, Word, Word, Word), n: u8, v_: Word) {
+    let v = program[(*ip + n as Word) as usize];
+    let p = 10_u32.pow(n as u32 - 1);
+    let mode = (*modes as u32 / p) % 10;
+    let addr = match mode {
+        0 => v as usize,
+        1 => panic!("mode 1 is not supported for write"),
+        2 => (*rel_base + v) as usize,
+        _ => panic!("unknown address mode {}", mode)
+    };
+    if program.len() <= addr {
+        program.resize(addr + 1, 0);
+    }
+    program[addr] = v_;
+}
+
