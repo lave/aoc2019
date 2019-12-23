@@ -73,6 +73,7 @@ fn run_((mut program, mut ip, mut rel_base): State, input: Data) -> Result {
             },
             3 => {  //  input
                 if i < input.len() {
+                    //println!("read input: {}", input[i]);
                     save(&mut ctx, 1, input[i]);
                     i += 1;
                     ip + 2
@@ -124,6 +125,12 @@ fn run_((mut program, mut ip, mut rel_base): State, input: Data) -> Result {
     }
 
     (output, (program, ip, rel_base))
+}
+
+
+#[allow(dead_code)]
+pub fn has_terminated((program, ip, _): &State) -> bool {
+    return program[*ip as usize] == 99;
 }
 
 
