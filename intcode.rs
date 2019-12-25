@@ -166,3 +166,24 @@ fn save((program, ip, rel_base, modes): &mut(&mut Program, Word, Word, Word), n:
     program[addr] = v_;
 }
 
+
+#[allow(dead_code)]
+pub fn to_ascii(data: &[Word]) -> String {
+    data.iter().map(|&v| v as u8 as char).collect::<String>()
+}
+
+#[allow(dead_code)]
+pub fn to_asciis(data: &[Word]) -> Vec<String> {
+    to_ascii(data).split("\n").map(|s| s.to_string()).collect()
+}
+
+#[allow(dead_code)]
+pub fn from_ascii(string: &str) -> Data {
+    string.chars().map(|v| v as u8 as Word).collect::<Data>()
+}
+
+#[allow(dead_code)]
+pub fn from_asciis(strings: &Vec<&str>) -> Data {
+    from_ascii(&(strings.join("\n") + "\n"))
+}
+

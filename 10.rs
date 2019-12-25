@@ -4,6 +4,8 @@ use std::fs::File;
 use std::cmp::max;
 use std::cmp::Ordering;
 
+mod common;
+
 type Map = (Vec<Vec<u8>>, i32, i32);
 type Asteroid = (i32, i32);
 
@@ -117,7 +119,7 @@ fn trace(
             obstructed[y as usize][x as usize] = 1;
             let mut dx = x - x0;
             let mut dy = y - y0;
-            let gcd = gcd(dx, dy);
+            let gcd = common::gcd(dx, dy);
             //println!("  {} {}: gcd {}", dx, dy, gcd);
             dx /= gcd;
             dy /= gcd;
@@ -134,25 +136,6 @@ fn trace(
             }
             1
         }
-    }
-}
-
-fn gcd(mut a: i32, mut b: i32) -> i32 {
-    a = a.abs();
-    b = b.abs();
-    if a < b {
-        std::mem::swap(&mut a, &mut b);
-    }
-    if b == 0 {
-        a
-    } else {
-        let mut r = a % b;
-        while r > 0 {
-            a = b;
-            b = r;
-            r = a % b;
-        }
-        b
     }
 }
 
