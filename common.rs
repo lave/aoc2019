@@ -26,7 +26,7 @@ pub fn to_u32(s: &str) -> u32 {
 }
 
 #[allow(dead_code)]
-pub fn gcd(mut a: i32, mut b: i32) -> i32 {
+pub fn gcd(mut a: i64, mut b: i64) -> i64 {
     a = a.abs();
     b = b.abs();
     if a < b {

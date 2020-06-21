@@ -19,10 +19,19 @@ fn main() {
     let bodies1 = simulate(&bodies, 1000);
     //println!("{:?}", bodies1);
     let energy = bodies1.iter().map(|b| energy(b)).sum::<i32>();
-    println!("{:?}", energy);
+    println!("{}", energy);
 
     //  part 2
-    simulate_loop(&bodies);
+    let loop_x = simulate_loop(
+        &bodies.iter().map(|((x, _, _), (x_, _, _))| (*x, *x_)).collect());
+    let loop_y = simulate_loop(
+        &bodies.iter().map(|((_, y, _), (_, y_, _))| (*y, *y_)).collect());
+    let loop_z = simulate_loop(
+        &bodies.iter().map(|((_, _, z), (_, _, z_))| (*z, *z_)).collect());
+
+    let loop_ = loop_x * loop_y / common::gcd(loop_x, loop_y);
+    let loop_ = loop_ * loop_z / common::gcd(loop_, loop_z);
+    println!("{}", loop_);
 }
 
 
@@ -44,12 +53,12 @@ fn parse_body(line: &str) -> Body {
 fn simulate(bodies: &Vec<Body>, n: u32) -> Vec<Body> {
     let mut bodies = bodies.clone();
     for _ in 0 .. n {
-        simulate1(&mut bodies);
+        simulate_(&mut bodies);
     }
     bodies
 }
 
-fn simulate1(bodies: &mut Vec<Body>) {
+fn simulate_(bodies: &mut Vec<Body>) {
     //  update speeds
     let m = bodies.len();
     for b1 in 0 .. m {
@@ -87,25 +96,49 @@ fn energy(((x, y, z), (x_, y_, z_)): &Body) -> i32 {
 }
 
 
-fn simulate_loop(bodies: &Vec<Body>) {
-    let mut bodies = bodies.clone();
-    let mut bodies2 = bodies.clone();
+fn simulate_loop(bodies: &Vec<(i32, i32)>) -> i64 {
 
-    let mut n = 0u64;
-    loop {
-        simulate1(&mut bodies);
-        simulate1(&mut bodies2);
-        simulate1(&mut bodies2);
+    fn simulate(bodies: &mut Vec<(i32, i32)>) {
+        //  update speeds
+        let m = bodies.len();
+        for b1 in 0 .. m {
+            for b2 in 0 .. b1 {
+                let (x1, _) = &bodies[b1];
+                let (x2, _) = &bodies[b2];
 
-        n += 1;
-        if n % 1000000 == 0 {
-            println!("{:?}", n);
+                let dx = if x1 < x2 { -1 } else if x1 > x2 { 1 } else { 0 };
+
+                let (_, x_) = &mut bodies[b1];
+                *x_ -= dx;
+
+                let (_, x_) = &mut bodies[b2];
+                *x_ += dx;
+            }
         }
 
-        if bodies == bodies2 { break; }
+        //  update positions
+        for b in 0 .. m {
+            let (x, x_) = &mut bodies[b];
+            *x += *x_;
+        }
     }
 
-    println!("{:?}", n);
-    println!("{:?}", bodies);
-    println!("{:?}", bodies2);
+    let mut bodies1 = bodies.clone();
+    let mut bodies2 = bodies.clone();
+
+    let mut n = 0;
+    loop {
+        simulate(&mut bodies1);
+        simulate(&mut bodies2);
+        simulate(&mut bodies2);
+
+        n += 1;
+        if bodies1 == bodies2 { break; }
+    }
+
+    //println!("{:?}", n);
+    //println!("{:?}", bodies1);
+    //println!("{:?}", bodies2);
+
+    n
 }
